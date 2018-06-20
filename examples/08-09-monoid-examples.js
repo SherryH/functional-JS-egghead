@@ -82,7 +82,14 @@ console.log(
 
 // Some semigroups are monoid - failsafe, some are not (Left vs Right)
 // X is a semigroup here
-const Right = X => ({});
+const Right = X => ({
+  chain: f => f(X),
+  map: f => Right(f(X)),
+  fold: (f, g) => g(X),
+  concat: o => o.fold(err => Left(err), Y => Right(X.concat(Y))),
+  isLeft: false,
+  inspect: () => `Right(${X})`
+});
 // const Right = x => ({
 //   // f has lifted values
 //   chain: f => f(x),
@@ -103,32 +110,48 @@ const Right = X => ({});
 //   inspect: _ => `Right(${x})`
 // });
 
-const Left = x => ({
+const Left = X => ({
   chain: f => f(x),
-
-  // Left ignores apply
-  ap: other => Left(x),
-  traverse: (of, f) => of(Left(x)),
-  fold: (f, g) => f(x),
-
-  // ignore f when apply to Left
-  map: f => Left(x),
-
-  // ignore concat when apply to Left
-  concat: o => o.fold(_ => Left(x), y => o),
+  fold: (f, g) => f(X),
+  map: f => Left(X),
+  concat: o => o.fold(_ => Left(X), () => o),
   isLeft: true,
-  inspect: _ => `Left(${x})`
+  inspect: _ => `Left(${X})`
 });
+
+// const Left = x => ({
+//   chain: f => f(x),
+
+//   // Left ignores apply
+//   ap: other => Left(x),
+//   traverse: (of, f) => of(Left(x)),
+//   fold: (f, g) => f(x),
+
+//   // ignore f when apply to Left
+//   map: f => Left(x),
+
+//   // ignore concat when apply to Left
+//   concat: o => o.fold(_ => Left(x), y => o),
+//   isLeft: true,
+//   inspect: _ => `Left(${x})`
+// });
 
 const stats = List.of(
   { page: "Home", views: 40 },
   { page: "About", views: 10 },
   { page: "Blog", views: 4 }
 );
+
+// https://github.com/DrBoolean/immutable-ext/blob/master/index.js
+// foldMap is like reduce()
 const totalStats = stats.foldMap(x => Sum(x.views), Sum(0));
 console.log(`totalStats : `, totalStats);
 
 // Wrap Either into First
+// First(Right(1)) returns an obj with fold(), concat() method
+// First(1).concat(First(4)) = First(1) only first elem remains
+// First(Right(1)).concat(First(Right(5))) => First(Right(1))
+// First(Left(1)).concat(First(Right(5))) => First(Right(5))
 const FirstEither = either => ({
   fold: f => f(either),
   concat: o => (either.isLeft ? o : FirstEither(either)),
